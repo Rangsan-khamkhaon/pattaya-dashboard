@@ -114,59 +114,28 @@ with panel_col:
         st.info("ไม่มีสถานที่เปิดในเวลานี้")
 
 # ==========================================
-# 🗺️ 5. แผนที่ (ฝั่งซ้าย) ด้วยเทคโนโลยี Pydeck (Deck.gl) โคตรลื่นและไม่กินแรม!
+# 🗺️ 5. แผนที่ (ฝั่งซ้าย)
 # ==========================================
 with map_col:
-    # 1. จัดเตรียมข้อมูลสำหรับพล็อต (พังเพราะ RAM ต้องคุมให้อยู่)
-    plot_df = active_df.copy()
-    if len(plot_df) > 0:
-        # รวมชื่อไทย/อังกฤษ ไว้โชว์ใน Tooltip
-        plot_df['name_show'] = plot_df['Display Name (TH)'].fillna(plot_df['Display Name (EN)'])
+    m = folium.Map(location=[12.9236, 100.8825], zoom_start=13, tiles='CartoDB positron')
     
-    # 2. ตั้งค่ามุมกล้องเริ่มต้น (เอียงกล้อง 45 องศาให้ดูเป็น 3D เท่ๆ)
-    view_state = pdk.ViewState(
-        latitude=12.9236,
-        longitude=100.8825,
-        zoom=12,
-        pitch=45,
-    )
+    marker_cluster = MarkerCluster(name="Places Currently Open").add_to(m)
+    for idx, row in active_df.iterrows():
+        name = row.get('Display Name (TH)', row.get('Display Name (EN)', 'N/A'))
+        popup_html = f"<b>{name}</b><br>กลุ่ม: {row['Sub-Category']}<br>เปิด: {row['open_hour']:02d}:00 - {row['close_hour']:02d}:00"
+        
+        folium.CircleMarker(
+            location=[row['latitude'], row['longitude']],
+            radius=5, color='#2ECC71', fill=True, fill_color='#2ECC71', fill_opacity=0.8,
+            popup=folium.Popup(popup_html, max_width=300), tooltip=f"{name}"
+        ).add_to(marker_cluster)
 
-    layers = []
-
-    # 3. เลเยอร์ที่ 1: จุดสถานที่กำลังเปิด (ใช้ ScatterplotLayer ทำงานไวมาก)
-    if len(plot_df) > 0:
-        scatter_layer = pdk.Layer(
-            "ScatterplotLayer",
-            data=plot_df,
-            get_position='[longitude, latitude]',
-            get_color='[46, 204, 113, 200]', # สีเขียวนีออน
-            get_radius=40, # รัศมีวงกลม (เมตร)
-            pickable=True, # ให้เอาเมาส์ชี้ได้
-        )
-        layers.append(scatter_layer)
-
-    # 4. เลเยอร์ที่ 2: Heatmap จุดรถติด (ถ้าเปิดโหมดไว้)
     if traffic_mode and len(closing_soon_df) > 0:
-        heat_layer = pdk.Layer(
-            "HeatmapLayer",
-            data=closing_soon_df,
-            get_position='[longitude, latitude]',
-            opacity=0.8,
-            get_weight=1,
-            radiusPixels=30, # ขนาดความฟุ้งของ Heatmap
-        )
-        layers.append(heat_layer)
+        heat_data = [[row['latitude'], row['longitude']] for index, row in closing_soon_df.iterrows()]
+        HeatMap(heat_data, radius=20, blur=15, gradient={0.4: 'yellow', 0.6: 'orange', 1: 'red'}).add_to(m)
 
-    # 5. วาดแผนที่! (ใช้ map_style ธีมมืดให้เข้ากับแสงสีพัทยา)
-    r = pdk.Deck(
-        layers=layers,
-        initial_view_state=view_state,
-        map_style="mapbox://styles/mapbox/dark-v9",
-        tooltip={"html": "<b>{name_show}</b><br>หมวดหมู่: {Sub-Category}"}
-    )
-    
-    # โชว์บน Streamlit
-    st.pydeck_chart(r, use_container_width=True)
+    # 💡 พระเอกอยู่ตรงนี้: ยืดความสูงแผนที่จาก 600 เป็น 720 ให้มันพอดีกับแผงควบคุมฝั่งขวา
+    components.html(m._repr_html_(), height=1000)
 
 # ==========================================
 # 📋 6. โซนล่างสุด: ตารางข้อมูลดิบ
