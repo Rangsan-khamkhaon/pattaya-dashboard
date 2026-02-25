@@ -72,7 +72,7 @@ map_col, panel_col = st.columns([7.5, 2.5], gap="small")
 # 🎛️ 4. แผงควบคุม (ฝั่งขวา)
 # ==========================================
 with panel_col:
-    st.markdown("<h2>🗺️ Pattaya 4D</h2>", unsafe_allow_html=True)
+    st.markdown("<h2>Pattaya 4D Dashboard</h2>", unsafe_allow_html=True)
     st.markdown("<p style='color: gray;'>ระบบวิเคราะห์พลวัตเมือง (Day/Night Economy)</p>", unsafe_allow_html=True)
     st.divider()
 
