@@ -120,21 +120,37 @@ with map_col:
     m = folium.Map(location=[12.9236, 100.8825], zoom_start=13, tiles='CartoDB positron')
     
     marker_cluster = MarkerCluster(name="Places Currently Open").add_to(m)
-    for idx, row in active_df.iterrows():
-        name = row.get('Display Name (TH)', row.get('Display Name (EN)', 'N/A'))
-        popup_html = f"<b>{name}</b><br>กลุ่ม: {row['Sub-Category']}<br>เปิด: {row['open_hour']:02d}:00 - {row['close_hour']:02d}:00"
+    
+    # 🚀 OPTIMIZATION: ดึงข้อมูลเป็น List ก่อน เพื่อให้ลูปทำงานไวปรี๊ด (ทิ้ง iterrows ไปเลย)
+    if len(active_df) > 0:
+        lats = active_df['latitude'].values
+        lons = active_df['longitude'].values
         
-        folium.CircleMarker(
-            location=[row['latitude'], row['longitude']],
-            radius=5, color='#2ECC71', fill=True, fill_color='#2ECC71', fill_opacity=0.8,
-            popup=folium.Popup(popup_html, max_width=300), tooltip=f"{name}"
-        ).add_to(marker_cluster)
+        # จัดการชื่อให้เรียบร้อย
+        names_th = active_df['Display Name (TH)'].values
+        names_en = active_df['Display Name (EN)'].values
+        names = [str(th) if pd.notna(th) else str(en) for th, en in zip(names_th, names_en)]
+        
+        subs = active_df['Sub-Category'].values
+        opens = active_df['open_hour'].values
+        closes = active_df['close_hour'].values
+        
+        # ใช้ zip() วนลูป ซึ่งเร็วกว่า iterrows มหาศาล
+        for lat, lon, name, sub, o, c in zip(lats, lons, names, subs, opens, closes):
+            popup_html = f"<b>{name}</b><br>กลุ่ม: {sub}<br>เปิด: {o:02d}:00 - {c:02d}:00"
+            
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=5, color='#2ECC71', fill=True, fill_color='#2ECC71', fill_opacity=0.8,
+                popup=folium.Popup(popup_html, max_width=300), tooltip=f"{name}"
+            ).add_to(marker_cluster)
 
+    # จัดการ Heatmap ก็ใช้ values เลยเพื่อให้ไวขึ้น
     if traffic_mode and len(closing_soon_df) > 0:
-        heat_data = [[row['latitude'], row['longitude']] for index, row in closing_soon_df.iterrows()]
+        heat_data = closing_soon_df[['latitude', 'longitude']].values.tolist()
         HeatMap(heat_data, radius=20, blur=15, gradient={0.4: 'yellow', 0.6: 'orange', 1: 'red'}).add_to(m)
 
-    # 💡 พระเอกอยู่ตรงนี้: ยืดความสูงแผนที่จาก 600 เป็น 720 ให้มันพอดีกับแผงควบคุมฝั่งขวา
+    # แสดงแผนที่
     components.html(m._repr_html_(), height=1000)
 
 # ==========================================
